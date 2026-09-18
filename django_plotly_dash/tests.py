@@ -28,6 +28,7 @@ SOFTWARE.
 '''
 
 import json
+import re
 from unittest.mock import patch
 
 import pytest
@@ -36,7 +37,9 @@ from dash.dependencies import Input, State, Output
 from django.urls import reverse
 
 from django_plotly_dash import DjangoDash
-from django_plotly_dash.dash_wrapper import get_local_stateless_list, get_local_stateless_by_name
+from django_plotly_dash.dash_wrapper import (PseudoFlask, WrappedDash,
+                                             get_local_stateless_list,
+                                             get_local_stateless_by_name)
 from django_plotly_dash.models import DashApp, find_stateless_by_name
 from django_plotly_dash.tests_dash_contract import fill_in_test_app, dash_contract_data
 
@@ -50,6 +53,45 @@ def test_dash_app():
     assert stateless_a
     assert stateless_a.app_name
     assert str(stateless_a) == stateless_a.app_name
+
+
+def test_pseudo_flask_config_attributes():
+    'Check Flask config-backed attributes have their standard defaults'
+
+    server = PseudoFlask()
+
+    assert server.config.keys() >= server.default_config.keys()
+    assert server.secret_key is None
+    assert server.testing is False
+
+    server.secret_key = 'configured-secret'
+    assert server.secret_key == 'configured-secret'
+
+
+def test_dash_callback_signing_config():
+    'Check Dash callback signing works with the pseudo Flask server'
+
+    app = WrappedDash(base_pathname='/callback-signing/', ndid='CallbackSigning')
+    config_html = app._generate_config_html()  # pylint: disable=protected-access
+    config = json.loads(re.search(r'>(.*)</script>', config_html).group(1))
+
+    # Dash 4.4.1 added signed per-page callback end IDs. Dash 3 does not have
+    # this API, but should still be able to generate its configuration.
+    if hasattr(app, '_get_signing_secret'):
+        from dash import _callback_signing  # pylint: disable=import-outside-toplevel
+
+        secret = app._get_signing_secret()  # pylint: disable=protected-access
+        assert isinstance(secret, bytes)
+        assert secret
+        assert _callback_signing.unsign(
+            secret, _callback_signing.END_SCOPE, config['end_id'])
+
+        configured_app = WrappedDash(
+            base_pathname='/configured-signing/', ndid='ConfiguredSigning')
+        configured_app.server.secret_key = 'configured-secret'
+        assert configured_app._get_signing_secret() == b'configured-secret'  # pylint: disable=protected-access
+    else:
+        assert 'end_id' not in config
 
 
 @pytest.mark.django_db

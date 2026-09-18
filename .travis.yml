@@ -1,15 +1,20 @@
 # Travis CI
-dist: xenial
+dist: jammy
 language: python
 
 python:
-  - "3.6"
+  - "3.11"
+
+env:
+  jobs:
+    - DASH_VERSION="dash==3.4.0"
+    - DASH_VERSION="dash==4.4.1"
 
 cache:
   - pip
 
 install:
-  - pip install -r requirements.txt
+  - pip install -r requirements.txt "$DASH_VERSION"
   - pip install -r dev_requirements.txt
   - python setup.py develop
 

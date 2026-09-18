@@ -379,7 +379,10 @@ class DjangoDash:
 class PseudoFlask(Flask):
     'Dummy implementation of a Flask instance, providing stub functionality'
     def __init__(self):
-        self.config = {'DEBUG': False}
+        # Flask properties such as ``secret_key`` are backed by entries in
+        # ``config``.  Populate Flask's defaults without running its full
+        # initializer, which would change the behaviour of this adapter.
+        self.config = dict(self.default_config)
         self.endpoints = {}
         self.name = "PseudoFlaskDummyName"
         self.blueprints = {}
@@ -828,4 +831,3 @@ class WrappedDash(Dash):
         class, and this interferes with the operation of Django templates.
         """
         return self
-

@@ -22,9 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 '''
+import json
 import re
 
 import pytest
+from dash import Dash
 from django.urls import reverse
 
 
@@ -43,6 +45,25 @@ def test_template_tag_use(client):
         for src in re.findall('iframe src="(.*?)"', response.content.decode("utf-8")):
             response = client.get(src + "_dash-layout")
             assert response.status_code == 200, ""
+
+
+@pytest.mark.django_db
+def test_direct_embedding_generates_dash_config(client):
+    'Check the direct embedding path includes a usable Dash configuration'
+
+    response = client.get(reverse('demo-five'))
+
+    assert response.status_code == 200
+    match = re.search(
+        r'<script id="_dash-config" type="application/json">(.*?)</script>',
+        response.content.decode('utf-8'),
+    )
+    assert match
+
+    config = json.loads(match.group(1))
+    assert config['requests_pathname_prefix']
+    if hasattr(Dash, '_get_signing_secret'):
+        assert config['end_id']
 
 
 @pytest.mark.django_db
